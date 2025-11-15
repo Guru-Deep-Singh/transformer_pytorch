@@ -1,0 +1,13 @@
+torch==2.8.0 --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+torchvision==0.23.0 --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+torchaudio==2.8.0 --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+#Numpy 1. to avoid warnings from torch
+numpy==1.26.4
+# Self built wheel for torchtext for jetson
+./jetson_wheel/torchtext-0.18.0a0+9bed85d-cp310-cp310-linux_aarch64.whl
+datasets --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+tokenizers --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+torchmetrics --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+tensorboard --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+altair --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+wandb --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
