@@ -74,7 +74,7 @@ class PositionalEncoding(nn.Module):
         Returns:
             Tensor: The input tensor with positional encodings added and dropout applied, shape (batch_size, sequence_length, d_model).
         """
-        x = x + (self.pe[:, :x.shape[1], :]).requires_grad(False) # we do not need to learn as positional embedding is fixed
+        x = x + (self.pe[:, :x.shape[1], :]).requires_grad_(False) # we do not need to learn as positional embedding is fixed
         return self.dropout(x)
 
 

@@ -1,7 +1,7 @@
 from typing import Any
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, Dataloader, random_split
+from torch.utils.data import Dataset, DataLoader, random_split
 
 from dataset import BilingualDataset, causal_mask
 from model import build_transformer
@@ -65,8 +65,8 @@ def get_ds(config):
     print(f'Max length of source sentences: {max_len_src}')
     print(f'Max length of target sentences: {max_len_tgt}')
 
-    train_dataloader = Dataloader(train_ds, batch_size=config['batch_size'], shuffle=True)
-    val_dataloader = Dataloader(val_ds, batch_size=1, shuffle=True)
+    train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True)
+    val_dataloader = DataLoader(val_ds, batch_size=1, shuffle=True)
 
     return train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt
 

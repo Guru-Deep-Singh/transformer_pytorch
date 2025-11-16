@@ -1,2 +1,5 @@
 # Ignore the venv
 myenv_jetson/*
+__pycache__*
+runs/*
+tokenizer*
