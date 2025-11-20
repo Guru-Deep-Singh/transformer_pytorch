@@ -64,6 +64,8 @@ transformer_pytorch/
 ├── requirements.txt     # Python dependencies
 ├── test_version.py      # Package version checker
 ├── torchtext_install_0_18.sh  # TorchText build script for Jetson
+├── complie_pycuda_jetson.sh  # PyCuda build script for jetson
+├── export_onnx_tensorrt.py   # Export the ".pt" model in ONNX and TensorRT engine
 ├── jetson_wheel/        # Pre-built torchtext wheel for Jetson
 └── docs/                # Sphinx documentation source files
 ```
@@ -87,6 +89,12 @@ transformer_pytorch/
 - numpy 1.21.5
 - pandas 1.3.5
 
+#### Optional Dependencies
+- onnx
+- onnxruntime
+- pycuda
+- tensorrt
+
 ## 🚀 Installation
 
 ### For Jetson Nano
@@ -107,6 +115,12 @@ transformer_pytorch/
    - If you prefer to build from source, use the provided script:
      ```bash
      bash torchtext_install_0_18.sh
+     ```
+4. **PyCuda Installation**:
+   - A pre-built wheel is provided in `jetson_wheel/` directory
+   - If you prefer to build from source, use the provided script:
+     ```bash
+     bash compile_pycuda_jetson.sh
      ```
 
 ### For Other Platforms

@@ -28,9 +28,10 @@ huggingface_hub==0.16.4
 tokenizers --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
 
 # ------------------------------
-# torchtext (custom Jetson wheel)
+# (custom Jetson wheel)
 # ------------------------------
 ./jetson_wheel/torchtext-0.18.0a0+9bed85d-cp310-cp310-linux_aarch64.whl
+./jetson_wheel/pycuda-2025.1.2-cp310-cp310-linux_aarch64.whl
 
 # ------------------------------
 # torchmetrics + matplotlib pairing
@@ -46,3 +47,9 @@ matplotlib-inline==0.1.6
 tensorboard --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
 altair --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
 wandb --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+
+# ------------------------------
+# ONNX
+# ------------------------------
+onnx
+onnxruntime
