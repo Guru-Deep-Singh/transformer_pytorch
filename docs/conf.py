@@ -36,7 +36,8 @@ autodoc_mock_imports = [
     "tensorboard",
     "altair",
     "wandb",
-    "tqdm"
+    "tqdm",
+    "tensorrt"
 ]
 
 
