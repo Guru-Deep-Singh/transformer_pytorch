@@ -5,4 +5,8 @@ runs/*
 tokenizer*
 docs/_build/
 docs_env/
+onnx/*
+tensorrt/*
+weights/*
+tmp/*
 
