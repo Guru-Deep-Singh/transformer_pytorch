@@ -8,4 +8,6 @@ transformer_pytorch
    dataset
    model
    train
-   export_onnx_tensorrt
+   export_onnx_tensorrt_split
+   run_trt_split
+   test_version

@@ -37,7 +37,9 @@ autodoc_mock_imports = [
     "altair",
     "wandb",
     "tqdm",
-    "tensorrt"
+    "tensorrt",
+    "pycuda",
+    "numpy",
 ]
 
 

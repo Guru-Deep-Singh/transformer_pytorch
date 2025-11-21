@@ -6,15 +6,14 @@ import torch
 import torch.nn as nn
 from tokenizers import Tokenizer
 
-# Assuming these are available in your project structure
 from config import get_config, latest_weights_file_path
 from model import build_transformer
 
-# ==============================================================================
-# 1. WRAPPER CLASSES
+
+# WRAPPER CLASSES
 # These wrappers allow us to export specific methods (encode, decode, project)
 # as if they were the main 'forward' method, which ONNX requires.
-# ==============================================================================
+
 
 class EncoderWrapper(nn.Module):
     def __init__(self, model):
@@ -40,9 +39,8 @@ class ProjectionWrapper(nn.Module):
     def forward(self, x):
         return self.model.project(x)
 
-# ==============================================================================
-# 2. UTILITIES
-# ==============================================================================
+
+# UTILITIES
 
 def load_tokenizers(config):
     tokenizer_src_path = Path(config['tokenizer_file'].format(config['lang_src']))
@@ -105,9 +103,8 @@ def build_single_engine(onnx_path, engine_path, min_shapes, opt_shapes, max_shap
     print(f"--> Building Engine {engine_path}...")
     subprocess.run(" ".join(cmd), shell=True, check=True)
 
-# ==============================================================================
-# 3. MAIN WORKFLOW
-# ==============================================================================
+
+# MAIN WORKFLOW
 
 def main():
     config = get_config()
@@ -122,7 +119,7 @@ def main():
     model_base_name = Path(ckpt_path).stem
     vars = prepare_model_variables(config)
     
-    # 1. Load Monolithic Model
+    # Load Monolithic Model
     print("Loading PyTorch Model...")
     model = build_transformer(
         vars["SRC_VOCAB_SIZE"], vars["TGT_VOCAB_SIZE"],
@@ -141,7 +138,7 @@ def main():
     USE_FP16 = False
 
     # ==========================================================================
-    # EXPORT 1: ENCODER
+    # ENCODER
     # ==========================================================================
     enc_wrapper = EncoderWrapper(model)
     enc_onnx = onnx_dir / f"{model_base_name}_encoder.onnx"
@@ -169,11 +166,10 @@ def main():
         opt_shapes=f"src:1x{seq_len},src_mask:1x1x{seq_len}x{seq_len}",
         max_shapes=f"src:8x{seq_len},src_mask:8x1x{seq_len}x{seq_len}",
         use_fp16 = USE_FP16 
-        # Note: Increased max batch to 8 for flexibility
     )
 
     # ==========================================================================
-    # EXPORT 2: DECODER  (FIXED DUMMY INPUTS)
+    # DECODER
     # ==========================================================================
     dec_wrapper = DecoderWrapper(model)
     dec_onnx = onnx_dir / f"{model_base_name}_decoder.onnx"
@@ -182,11 +178,11 @@ def main():
     # Encoder output dummy (full src length is fine)
     dummy_enc_out = torch.randn(bs, seq_len, d_model)
 
-    # >>> IMPORTANT: export decoder for incremental decode <<<
+    # export decoder for incremental decode
     dummy_tgt_len = 2   # 1 or 2 is enough to keep shapes symbolic
     dummy_tgt = torch.randint(0, vars["TGT_VOCAB_SIZE"], (bs, dummy_tgt_len))
 
-    # causal lower-tri mask like your real inference
+    # causal lower-tri mask like in dataset.py file
     dummy_tgt_mask = torch.tril(torch.ones(bs, 1, dummy_tgt_len, dummy_tgt_len))
 
     # src_mask for cross-attn (binary, broadcast shape)
@@ -204,8 +200,7 @@ def main():
             'tgt': {0: 'batch', 1: 'tgt_seq'},
             'tgt_mask': {0: 'batch', 2: 'tgt_seq', 3: 'tgt_seq'},
             'decoder_output': {0: 'batch', 1: 'tgt_seq'}
-        },
-        # <<< ADD THIS inside export_single_onnx (see below) >>>
+        }
         )
 
     build_single_engine(
@@ -217,7 +212,7 @@ def main():
     )
 
     # ==========================================================================
-    # EXPORT 3: PROJECTION
+    # PROJECTION
     # ==========================================================================
     proj_wrapper = ProjectionWrapper(model)
     proj_onnx = onnx_dir / f"{model_base_name}_projection.onnx"

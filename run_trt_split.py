@@ -10,7 +10,7 @@ if torch.cuda.is_available():
     torch.cuda.set_per_process_memory_fraction(0.6)
 # ------------------------------------
 
-# Initialize CUDA driver (NO pycuda.autoinit)
+# Initialize CUDA driver
 cuda.init()
 
 # Import your existing validation/config logic
@@ -79,14 +79,14 @@ class TRTEngine:
 
                 data = inputs_dict[name]
 
-                # TRT 10: Set dynamic shape for this input
+                # TRT 10.X: Set dynamic shape for this input
                 self.context.set_input_shape(name, data.shape)
 
                 # Allocate GPU memory for input
                 d_input = cuda.mem_alloc(data.nbytes)
                 cuda.memcpy_htod_async(d_input, data, self.stream)
 
-                # TRT 10: Bind tensor address
+                # TRT 10.X: Bind tensor address
                 self.context.set_tensor_address(name, int(d_input))
                 device_allocations.append(d_input)
 
@@ -160,7 +160,7 @@ class TRTTransformer:
         if src_mask.dim() == 4 and src_mask.shape[2] == 1:
             src_mask = src_mask.repeat(1, 1, seq_len, 1)  # (B,1,1,S)->(B,1,S,S)
 
-        # >>> KEY: keep it binary, just cast to float <<<
+        # keep it binary, just cast to float 
         src_mask = src_mask.float()
 
         inputs = {
@@ -182,7 +182,7 @@ class TRTTransformer:
         if tgt_mask.dim() == 3:
             tgt_mask = tgt_mask.unsqueeze(1)
 
-        # >>> KEY: keep binary, cast to float <<<
+        # keep binary, cast to float
         src_mask = src_mask.float()
         tgt_mask = tgt_mask.float()
 
@@ -212,11 +212,6 @@ class TRTTransformer:
             res = res.squeeze(1)
         return res
 
-
-
-# ==============================================================================
-# COPIED FROM YOUR CODE (Standard Logic)
-# ==============================================================================
 
 def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_len, device):
     sos_idx = tokenizer_tgt.token_to_id("[SOS]")

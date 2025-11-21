@@ -65,7 +65,9 @@ transformer_pytorch/
 ├── test_version.py      # Package version checker
 ├── torchtext_install_0_18.sh  # TorchText build script for Jetson
 ├── complie_pycuda_jetson.sh  # PyCuda build script for jetson
-├── export_onnx_tensorrt.py   # Export the ".pt" model in ONNX and TensorRT engine
+├── export_onnx_tensorrt_split.py   # Export the ".pt" model split into encoder/decoder/projection components as ONNX and TensorRT engines
+├── run_trt_split.py     # Run inference using split TensorRT engines (encoder, decoder, projection)
+├── Inference.ipynb      # Jupyter notebook for inference, benchmarking, and comparing PyTorch vs TensorRT models
 ├── jetson_wheel/        # Pre-built torchtext wheel for Jetson
 └── docs/                # Sphinx documentation source files
 ```
@@ -94,6 +96,7 @@ transformer_pytorch/
 - onnxruntime
 - pycuda
 - tensorrt
+- jupyter (for Inference.ipynb)
 
 ## 🚀 Installation
 
@@ -185,6 +188,119 @@ Check installed package versions:
 ```bash
 python test_version.py
 ```
+
+## 🚀 TensorRT Export and Inference (Split Model)
+
+The repository includes scripts to export the trained model to ONNX and TensorRT formats, split into separate components for optimized inference.
+
+### Exporting to ONNX and TensorRT (Split)
+
+The `export_onnx_tensorrt_split.py` script exports the trained PyTorch model by splitting it into three components:
+- **Encoder**: Processes source sequences
+- **Decoder**: Generates target sequences using encoder output
+- **Projection**: Maps decoder output to vocabulary logits
+
+This split approach allows for:
+- Better memory management on resource-constrained devices
+- Incremental decoding (generating tokens one at a time)
+- More flexible inference pipeline
+
+To export your trained model:
+
+```bash
+python export_onnx_tensorrt_split.py
+```
+
+The script will:
+1. Load the latest checkpoint from `weights/` directory
+2. Export each component (encoder, decoder, projection) to ONNX format in `onnx_split/`
+3. Build TensorRT engines for each component in `tensorrt_split/`
+4. Support dynamic shapes for variable sequence lengths
+
+**Requirements**: 
+- TensorRT installed and `trtexec` available in PATH or at `/usr/src/tensorrt/bin/trtexec`
+- ONNX and TensorRT Python packages
+
+### Running Inference with TensorRT (Split)
+
+The `run_trt_split.py` script loads the split TensorRT engines and runs inference on the validation dataset:
+
+```bash
+python run_trt_split.py
+```
+
+The script:
+- Loads the three TensorRT engines (encoder, decoder, projection)
+- Runs greedy decoding for translation
+- Validates on the test dataset and prints translation examples
+- Uses TensorRT 10.3+ API with `execute_async_v3` for optimal performance
+
+**Note**: Make sure the engine files exist in `tensorrt_split/` directory before running inference. The default paths are:
+- `tensorrt_split/tmodel_10_encoder.engine`
+- `tensorrt_split/tmodel_10_decoder.engine`
+- `tensorrt_split/tmodel_10_projection.engine`
+
+You can modify these paths in the script if needed.
+
+### Inference and Benchmarking with Jupyter Notebook
+
+The `Inference.ipynb` notebook provides an interactive environment for:
+- **Running inference** with both PyTorch and TensorRT models
+- **Benchmarking performance** comparing latency between PyTorch and TensorRT
+- **Verifying correctness** by comparing outputs from both models
+- **Analyzing differences** in encoder outputs and logits
+
+#### Features
+
+1. **Model Loading**:
+   - Loads trained PyTorch model from checkpoints
+   - Loads split TensorRT engines (encoder, decoder, projection)
+
+2. **Performance Benchmarking**:
+   - Measures inference latency for both models
+   - Computes statistics: mean, p50, p90, p99 percentiles
+   - Calculates speedup factor (PyTorch / TensorRT)
+   - Saves results to `benchmark_times.csv`
+
+3. **Output Comparison**:
+   - Side-by-side comparison of translations from both models
+   - Verifies numerical accuracy of encoder outputs
+   - Compares first-step logits between models
+   - Analyzes differences in padded vs unpadded positions
+
+4. **Validation**:
+   - Runs validation on test dataset
+   - Displays translation examples with source, target, and predictions
+
+#### Usage
+
+1. **Open the notebook**:
+   ```bash
+   jupyter notebook Inference.ipynb
+   ```
+
+2. **Run all cells** to:
+   - Load both models
+   - Run benchmarks
+   - Compare outputs
+   - Generate performance statistics
+
+3. **View results**:
+   - Benchmark statistics are printed in the notebook
+   - Detailed comparison outputs show translation quality
+   - CSV file with timing data is saved for further analysis
+
+4. **TensorBoard Integration**:
+   - The notebook includes instructions for viewing TensorBoard logs
+   - Use SSH port forwarding: `ssh -L 6005:localhost:6005 user@jetson_ip`
+   - Access TensorBoard at `http://localhost:6005`
+
+#### Expected Outputs
+
+- **Latency metrics**: Mean, median (p50), p90, and p99 percentiles in milliseconds
+- **Speedup factor**: Typically 1.2x - 1.5x on Jetson devices
+- **Numerical accuracy**: Encoder output differences typically < 0.001
+- **Translation quality**: Both models should produce similar translations
 
 ## 📚 Documentation
 
