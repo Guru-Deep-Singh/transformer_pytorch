@@ -1,5 +1,5 @@
-transformer_pytorch
-===================
+Transformer_PyTorch_TensorRT
+=============================
 
 .. toctree::
    :maxdepth: 4

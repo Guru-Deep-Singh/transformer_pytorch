@@ -1,7 +1,8 @@
-# Transformer PyTorch - Machine Translation Implementation
+# Transformer PyTorch TensorRT - Machine Translation Implementation
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0-orange.svg)
+![TensorRT](https://img.shields.io/badge/TensorRT-10.3-red.svg)
 ![CUDA](https://img.shields.io/badge/CUDA-12.6-green.svg)
 ![OS](https://img.shields.io/badge/OS-Linux-lightgrey.svg)
 ![Platform](https://img.shields.io/badge/Platform-Jetson%20Nano-yellow.svg)
@@ -56,7 +57,7 @@ The model follows the standard Transformer architecture:
 ## 📁 Project Structure
 
 ```
-transformer_pytorch/
+Transformer_PyTorch_TensorRT/
 ├── model.py              # Transformer architecture implementation
 ├── dataset.py            # BilingualDataset and data processing
 ├── train.py             # Training script with validation
