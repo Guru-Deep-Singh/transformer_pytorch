@@ -11,4 +11,5 @@ tensorrt_split/*
 onnx_split/*
 weights/*
 tmp/*
-
+.ipynb_*
+benchmark_times.csv
