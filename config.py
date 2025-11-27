@@ -23,8 +23,8 @@ def get_config():
             - experiment_name (str): Directory path for experiment tracking/logging (default: "runs/tmodel").
     """
     return {
-        "batch_size": 8,
-        "num_epochs": 20,
+        "batch_size": 4,
+        "num_epochs": 30,
         "lr": 10**-4,
         "seq_len": 512,
         "d_model": 512,
@@ -33,7 +33,7 @@ def get_config():
         "lang_tgt": "de",
         "model_folder": "weights",
         "model_basename": "tmodel_",
-        "preload": None,
+        "preload": "29",
         "tokenizer_file": "tokenizer_{0}.json",
         "experiment_name": "runs/tmodel"
     }
@@ -81,7 +81,7 @@ def latest_weights_file_path(config):
         >>> latest_weights_file_path(config)
         'opus_books_weights/tmodel_19.pt'
     """
-    model_folder = f"{config['datasource']}_{config['model_folder']}"
+    model_folder = f"{config['model_folder']}"
     model_filename = f"{config['model_basename']}*"
     weights_files = list(Path(model_folder).glob(model_filename))
     if len(weights_files) == 0:
