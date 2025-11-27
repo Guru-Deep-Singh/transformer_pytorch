@@ -215,9 +215,27 @@ def get_ds(config):
         The dataset is split into 90% training and 10% validation.
         Also prints the maximum length of source and target sentences.
     """
-    #ds_raw = load_dataset(f"{config['datasource']}", f'{config["lang_src"]}-{config["lang_tgt"]}', split='train')
-    # For opus_books we have de-en not en-de thus we flipped 
-    ds_raw = load_dataset(f"{config['datasource']}", f'{config["lang_tgt"]}-{config["lang_src"]}', split='train')
+    src = config["lang_src"]
+    tgt = config["lang_tgt"]
+    ds_name = config["datasource"]
+
+    try:
+        ds_raw = load_dataset(ds_name, f"{src}-{tgt}", split='train')
+        print(f"Loaded dataset with config: {src}-{tgt}")
+    except Exception:
+        print(f"The dataset {src}-{tgt} is not available.")
+        print(f"Checking availability of {tgt}-{src}...")
+
+        try:
+            # For opus_books we have de-en not en-de thus we flipped 
+            ds_raw = load_dataset(ds_name, f"{tgt}-{src}", split="train")
+            print(f"Loaded dataset with config: {tgt}-{src}")
+        except Exception as e:
+            raise RuntimeError(
+                f"❌ Neither {src}-{tgt} nor {tgt}-{src} could be loaded "
+                f"for the datasource '{ds_name}'. Original error:\n{e}"
+            )
+
 
     # Build tokenizers
     tokenizer_src = get_or_build_tokenizer(config, ds_raw, config['lang_src'])
