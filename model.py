@@ -304,7 +304,7 @@ class ResidualConnection(nn.Module):
         """
         super().__init__()
         self.dropout = nn.Dropout(dropout)
-        self.norm = LayerNormalization(features)
+        self.norm = nn.LayerNorm(features, eps=1e-6)
 
     def forward(self, x, sublayer):
         """
@@ -398,7 +398,7 @@ class Encoder(nn.Module):
         """
         super().__init__()
         self.layers = layers # Here the ModuleList will have EncoderBlocks x N where N = 6 in paper
-        self.norm = LayerNormalization(features)
+        self.norm = nn.LayerNorm(features, eps=1e-6)
 
     def forward(self, x, mask):
         """
@@ -511,7 +511,7 @@ class Decoder(nn.Module):
         """
         super().__init__()
         self.layers = layers
-        self.norm = LayerNormalization(features)
+        self.norm = nn.LayerNorm(features, eps=1e-6)
 
     def forward(self, x, encoder_output, src_mask, tgt_mask):
         """
