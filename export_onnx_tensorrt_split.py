@@ -8,6 +8,7 @@ from tokenizers import Tokenizer
 
 from config import get_config, latest_weights_file_path
 from model import build_transformer
+import gc
 
 
 # WRAPPER CLASSES
@@ -127,8 +128,36 @@ def main():
         d_model=vars["D_MODEL"], N=vars["N_LAYERS"], h=vars["N_HEADS"],
         dropout=vars["DROPOUT"], d_ff=vars["D_FF"]
     )
-    state_dict = torch.load(ckpt_path, map_location="cpu")
-    model.load_state_dict(state_dict["model_state_dict"])
+
+
+    # When I trained a model I used custom LayerNormalization which had a problem with fp16
+    # I replaced it with nn.LayerNorm thus need to have a patch to map weights with the trained values
+    PATCH = False
+
+    # Load the pretrained weights
+    checkpoint  = torch.load(ckpt_path,  map_location="cpu")
+    state_dict = checkpoint["model_state_dict"]
+
+    if PATCH:
+        # Rename 'alpha' to 'weight'
+        new_state_dict = {}
+        for key, value in state_dict.items():
+            if key.endswith(".alpha"):
+                # Replace .alpha with .weight
+                new_key = key.replace(".alpha", ".weight")
+                new_state_dict[new_key] = value
+            else:
+                new_state_dict[key] = value
+
+        model.load_state_dict(new_state_dict)
+        del checkpoint, state_dict, new_state_dict
+    else:
+        model.load_state_dict(state_dict)
+        del checkpoint, state_dict
+
+    torch.cuda.empty_cache()
+    gc.collect()
+
     model.eval()
 
     # Common Dimensions
@@ -165,7 +194,7 @@ def main():
         min_shapes="src:1x1,src_mask:1x1x1x1",
         opt_shapes=f"src:1x{seq_len},src_mask:1x1x{seq_len}x{seq_len}",
         max_shapes=f"src:8x{seq_len},src_mask:8x1x{seq_len}x{seq_len}",
-        use_fp16 = False #USE_FP16 # Forcing the encoder to be fp32 due to accuracy 
+        use_fp16 = USE_FP16 # Forcing the encoder to be fp32 due to accuracy 
     )
 
     # ==========================================================================
