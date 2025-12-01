@@ -1,14 +1,14 @@
 import os
 import shutil
-import subprocess
 from pathlib import Path
 import torch
 import torch.nn as nn
 from tokenizers import Tokenizer
+import tensorrt as trt
+import gc
 
 from config import get_config, latest_weights_file_path
 from model import build_transformer
-import gc
 
 
 # WRAPPER CLASSES
@@ -78,31 +78,97 @@ def export_single_onnx(model_wrapper, dummy_inputs, onnx_path, input_names, outp
         do_constant_folding=False
     )
 
-def build_single_engine(onnx_path, engine_path, min_shapes, opt_shapes, max_shapes, use_fp16=True):
-    """Generic function to build TRT engine with specific shapes."""
-    trtexec = "/usr/src/tensorrt/bin/trtexec" # Adjust path if needed
-    if not shutil.which("trtexec") and not os.path.exists(trtexec):
-        # Fallback check or error
-        raise RuntimeError("trtexec not found. Please check PATH or variable.")
+def parse_shape_string(shape_string):
+    """
+    Parses 'name:1x1,name2:1x2' into {'name': (1,1), 'name2': (1,2)}
+    """
+    shapes = {}
+    parts = shape_string.split(',')
+    for part in parts:
+        if not part.strip(): continue
+        name, dims_str = part.split(':')
+        dims = tuple(map(int, dims_str.split('x')))
+        shapes[name.strip()] = dims
+    return shapes
 
+def build_single_engine(onnx_path, engine_path_base, min_shapes, opt_shapes, max_shapes, use_fp16=True):
+    """
+    Builds TensorRT engine using the Python API.
+    """
+    # Define final engine path based on precision
     if use_fp16:
-        engine_path = engine_path.split(".")[0] + "_fp16.engine"
+        engine_path = engine_path_base.split(".")[0] + "_fp16.engine"
     else:
-        engine_path = engine_path.split(".")[0] + "_fp32.engine"
-    cmd = [
-        trtexec,
-        f"--onnx={onnx_path}",
-        f"--saveEngine={engine_path}",
-        f"--minShapes={min_shapes}",
-        f"--optShapes={opt_shapes}",
-        f"--maxShapes={max_shapes}",
-        "--verbose"
-    ]
-    if use_fp16:
-        cmd.append("--fp16")
+        engine_path = engine_path_base.split(".")[0] + "_fp32.engine"
 
     print(f"--> Building Engine {engine_path}...")
-    subprocess.run(" ".join(cmd), shell=True, check=True)
+
+    # Setup Logger and Builder
+    logger = trt.Logger(trt.Logger.WARNING)
+    builder = trt.Builder(logger)
+    
+    # Create Network (Explicit Batch is required for ONNX)
+    network_flags = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    network = builder.create_network(network_flags)
+    
+    # Create Parser
+    parser = trt.OnnxParser(network, logger)
+    
+    # Parse ONNX ( Using parse_from_file instead of read)
+    # This allows TRT to find the accompanying .data file in the same directory
+    absolute_onnx_path = os.path.abspath(onnx_path)
+    if not parser.parse_from_file(absolute_onnx_path):
+        print(f"❌ ERROR: Failed to parse the ONNX file: {absolute_onnx_path}")
+        for error in range(parser.num_errors):
+            print(parser.get_error(error))
+        return None
+
+    # Create Config
+    config = builder.create_builder_config()
+    
+    # Set Memory Pool (e.g., 4GB)
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 32)
+    
+    # Set FP16 flag if requested and supported
+    if use_fp16:
+        if builder.platform_has_fast_fp16:
+            config.set_flag(trt.BuilderFlag.FP16)
+        else:
+            print("Warning: FP16 requested but platform does not support it. Falling back to FP32.")
+
+    # Parse Shape Strings to Python Dictionaries
+    min_dict = parse_shape_string(min_shapes)
+    opt_dict = parse_shape_string(opt_shapes)
+    max_dict = parse_shape_string(max_shapes)
+
+    # Create Optimization Profile
+    profile = builder.create_optimization_profile()
+    
+    for name, min_dim in min_dict.items():
+        if name not in opt_dict or name not in max_dict:
+            raise ValueError(f"Input '{name}' missing from opt or max shapes.")
+        
+        opt_dim = opt_dict[name]
+        max_dim = max_dict[name]
+        
+        profile.set_shape(name, min_dim, opt_dim, max_dim)
+
+    config.add_optimization_profile(profile)
+
+    # Build Serialized Network
+    try:
+        serialized_engine = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        serialized_engine = engine.serialize() if engine else None
+
+    # Save to Disk
+    if serialized_engine:
+        with open(engine_path, "wb") as f:
+            f.write(serialized_engine)
+        print(f"✅ Engine successfully saved to: {engine_path}")
+    else:
+        print(f"❌ Failed to build engine for {onnx_path}")
 
 
 # MAIN WORKFLOW
@@ -115,7 +181,8 @@ def main():
     trt_dir.mkdir(exist_ok=True)
 
     ckpt_path = latest_weights_file_path(config)
-    if ckpt_path is None: raise RuntimeError("No checkpoint found.")
+    if ckpt_path is None or not os.path.exists(ckpt_path):
+        raise RuntimeError(f"No checkpoint found at {ckpt_path}")
     
     model_base_name = Path(ckpt_path).stem
     vars = prepare_model_variables(config)
@@ -194,7 +261,7 @@ def main():
         min_shapes="src:1x1,src_mask:1x1x1x1",
         opt_shapes=f"src:1x{seq_len},src_mask:1x1x{seq_len}x{seq_len}",
         max_shapes=f"src:8x{seq_len},src_mask:8x1x{seq_len}x{seq_len}",
-        use_fp16 = USE_FP16 # Forcing the encoder to be fp32 due to accuracy 
+        use_fp16=USE_FP16 
     )
 
     # ==========================================================================
@@ -204,7 +271,7 @@ def main():
     dec_onnx = onnx_dir / f"{model_base_name}_decoder.onnx"
     dec_engine = trt_dir / f"{model_base_name}_decoder.engine"
 
-    # Encoder output dummy (full src length is fine)
+    # Encoder output dummy
     dummy_enc_out = torch.randn(bs, seq_len, d_model)
 
     # export decoder for incremental decode
@@ -213,8 +280,7 @@ def main():
 
     # causal lower-tri mask like in dataset.py file
     dummy_tgt_mask = torch.tril(torch.ones(bs, 1, dummy_tgt_len, dummy_tgt_len))
-
-    # src_mask for cross-attn (binary, broadcast shape)
+    # Src mask for cross-attn
     dummy_src_mask = torch.ones(bs, 1, 1, seq_len)
 
     export_single_onnx(
@@ -230,7 +296,7 @@ def main():
             'tgt_mask': {0: 'batch', 2: 'tgt_seq', 3: 'tgt_seq'},
             'decoder_output': {0: 'batch', 1: 'tgt_seq'}
         }
-        )
+    )
 
     build_single_engine(
         str(dec_onnx), str(dec_engine),
@@ -266,7 +332,7 @@ def main():
         min_shapes=f"decoder_output:1x1x{d_model}",
         opt_shapes=f"decoder_output:1x{seq_len}x{d_model}",
         max_shapes=f"decoder_output:8x{seq_len}x{d_model}",
-        use_fp16 = USE_FP16
+        use_fp16=USE_FP16
     )
 
     print("\n🎉 All components exported successfully!")
